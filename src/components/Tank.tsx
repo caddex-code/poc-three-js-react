@@ -4,10 +4,9 @@ import { Group, Vector3 } from 'three';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { Obstacle } from '../utils/chunkManager';
 
-const INITIAL_SPEED = 5;
-const MAX_SPEED = INITIAL_SPEED * 3;
-const ACCELERATION = 10;
-const ROTATION_SPEED = 2;
+import { TANK_CONFIG } from '../config/constants';
+
+const { INITIAL_SPEED, MAX_SPEED, ACCELERATION, ROTATION_SPEED } = TANK_CONFIG;
 
 interface TankProps {
     onShoot: (position: Vector3, rotation: [number, number, number]) => void;

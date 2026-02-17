@@ -4,7 +4,8 @@ import { Vector3, Group } from 'three';
 import Tank from './Tank';
 import Bullet from './Bullet';
 import Chunk from './Chunk';
-import { TrackMarks, SmokeParticles } from './TankEffects';
+import { TrackMarks } from './effects/TrackMarks';
+import { SmokeParticles } from './effects/SmokeParticles';
 import { useGameContext } from '../context/GameContext';
 import { generateChunkData, getChunkKey, ChunkData, CHUNK_SIZE, Obstacle } from '../utils/chunkManager';
 
