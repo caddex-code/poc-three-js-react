@@ -4,7 +4,9 @@ import { Group, Vector3 } from 'three';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { Obstacle } from '../utils/chunkManager';
 
-const SPEED = 5;
+const INITIAL_SPEED = 5;
+const MAX_SPEED = INITIAL_SPEED * 3;
+const ACCELERATION = 10;
 const ROTATION_SPEED = 2;
 
 interface TankProps {
@@ -17,6 +19,7 @@ const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
     const localRef = useRef<Group>(null);
     const { forward, backward, left, right, shoot } = useKeyboard();
     const lastShootTime = useRef(0);
+    const currentSpeed = useRef(INITIAL_SPEED);
 
     // Sync local ref with innerRef if provided
     useEffect(() => {
@@ -33,11 +36,19 @@ const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
         if (right) localRef.current.rotation.y -= ROTATION_SPEED * delta;
 
         // Movement
+        const moveDir = Number(forward) - Number(backward);
+
+        // Update speed
+        if (moveDir !== 0) {
+            currentSpeed.current = Math.min(currentSpeed.current + ACCELERATION * delta, MAX_SPEED);
+        } else {
+            currentSpeed.current = INITIAL_SPEED;
+        }
+
         const direction = new Vector3(0, 0, 1);
         direction.applyAxisAngle(new Vector3(0, 1, 0), localRef.current.rotation.y);
 
-        const moveDir = Number(forward) - Number(backward);
-        const moveVec = direction.multiplyScalar(moveDir * SPEED * delta);
+        const moveVec = direction.multiplyScalar(moveDir * currentSpeed.current * delta);
 
         // Potential new position
         if (moveDir !== 0) {
