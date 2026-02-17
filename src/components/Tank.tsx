@@ -56,12 +56,10 @@ const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
             // Collision Check
             const TANK_RADIUS = 1.1;
             const hasCollision = obstacles.some(obs => {
-                const obsPos = new Vector3(obs.position[0], 0, obs.position[2]); // Ignore Y for 2D collision on ground
-                // Distance in XZ plane
+                if (obs.collidable === false) return false;
+                const obsPos = new Vector3(obs.position[0], 0, obs.position[2]);
                 const dist = new Vector3(nextPos.x, 0, nextPos.z).distanceTo(obsPos);
-                // Adjust obsRadius multiplier if needed, but chunkManager is now 1.0 based on scale
-                const obsRadius = obs.radius || 1.0;
-                // Allow a bit more overlap for "touching" feel
+                const obsRadius = obs.radius;
                 return dist < (TANK_RADIUS + obsRadius * 0.9);
             });
 

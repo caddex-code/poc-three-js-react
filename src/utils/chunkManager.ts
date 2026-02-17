@@ -11,6 +11,7 @@ export interface Obstacle {
     radius: number;
     scale: [number, number, number];
     seed: number;
+    collidable?: boolean;
 }
 
 export interface Target {
@@ -20,12 +21,21 @@ export interface Target {
     rotation: [number, number, number];
 }
 
+export interface GroundPatch {
+    id: string;
+    position: [number, number, number];
+    rotation: [number, number, number];
+    scale: [number, number, number];
+    seed: number;
+}
+
 export interface ChunkData {
     id: string;
     x: number;
     z: number;
     obstacles: Obstacle[];
     targets: Target[];
+    patches: GroundPatch[];
 }
 
 // Simple pseudo-random number generator for determinism based on seed
@@ -41,7 +51,6 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
     const seedBase = (chunkX * 15485863) ^ (chunkZ * 2038074743) ^ gameSeed;
 
     const obstacles: Obstacle[] = [];
-    const targets: Target[] = [];
 
     // Number of obstacles per chunk (deterministic)
     const numObstacles = Math.floor(seededRandom(seedBase) * 20) + 20; // High density: 20-40
@@ -106,13 +115,14 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
                 rotation,
                 radius,
                 scale,
-                seed: seed + i * 123
+                seed: seed + i * 123,
+                collidable: true
             });
             break; // Success, move to next obstacle
         }
     }
 
-    // Number of targets per chunk
+    const targets: Target[] = [];
     const numTargets = Math.floor(seededRandom(seedBase + 9382) * 5) + 3;
 
     for (let i = 0; i < numTargets; i++) {
@@ -162,11 +172,54 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
         }
     }
 
+    const patches: GroundPatch[] = [];
+
+    // Generate random ground patches (sand color variations)
+    const numPatches = Math.floor(seededRandom(seedBase + 777) * 8) + 5;
+    for (let i = 0; i < numPatches; i++) {
+        const seed = seedBase + 9000 + i;
+        const x = (seededRandom(seed) - 0.5) * CHUNK_SIZE + (chunkX * CHUNK_SIZE);
+        const z = (seededRandom(seed + 11) - 0.5) * CHUNK_SIZE + (chunkZ * CHUNK_SIZE);
+
+        patches.push({
+            id: `patch-${chunkX}-${chunkZ}-${i}`,
+            position: [x, -0.05, z], // Slightly above ground but below obstacles
+            rotation: [0, seededRandom(seed + 22) * Math.PI * 2, 0],
+            scale: [
+                4 + seededRandom(seed + 33) * 8,
+                1,
+                4 + seededRandom(seed + 44) * 8
+            ],
+            seed: seed
+        });
+    }
+
+    // Generate small pebbles (tiny rocks for ground detail)
+    const numPebbles = Math.floor(seededRandom(seedBase + 555) * 30) + 20;
+    for (let i = 0; i < numPebbles; i++) {
+        const seed = seedBase + 20000 + i;
+        const x = (seededRandom(seed) - 0.5) * CHUNK_SIZE + (chunkX * CHUNK_SIZE);
+        const z = (seededRandom(seed + 1) - 0.5) * CHUNK_SIZE + (chunkZ * CHUNK_SIZE);
+
+        const pebbleScale = 0.2 + seededRandom(seed + 2) * 0.4;
+        obstacles.push({
+            id: `pebble-${chunkX}-${chunkZ}-${i}`,
+            position: [x, 0, z],
+            type: 'rock',
+            rotation: [0, seededRandom(seed + 3) * Math.PI * 2, 0],
+            radius: 0, // No collision radius
+            scale: [pebbleScale, pebbleScale * 0.6, pebbleScale],
+            seed: seed,
+            collidable: false
+        });
+    }
+
     return {
         id: getChunkKey(chunkX, chunkZ),
         x: chunkX,
         z: chunkZ,
         obstacles,
         targets,
+        patches,
     };
 };
