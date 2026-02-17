@@ -14,10 +14,9 @@ function App() {
                     <OrthographicCamera
                         makeDefault
                         position={[20, 20, 20]}
-                        zoom={40}
+                        zoom={25}
                         near={-50}
                         far={200}
-                        onUpdate={c => c.lookAt(0, 0, 0)}
                     />
                     <GameScene />
                 </Canvas>

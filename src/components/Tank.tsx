@@ -1,38 +1,47 @@
-import { useRef } from 'react';
+import { MutableRefObject, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group, Vector3 } from 'three';
 import { useKeyboard } from '../hooks/useKeyboard';
+import { Obstacle } from '../utils/chunkManager';
 
 const SPEED = 5;
 const ROTATION_SPEED = 2;
 
 interface TankProps {
     onShoot: (position: Vector3, rotation: [number, number, number]) => void;
-    obstacles: { id: string; position: [number, number, number]; radius?: number }[];
+    obstacles: Obstacle[];
+    innerRef?: MutableRefObject<Group | null>;
 }
 
-const Tank = ({ onShoot, obstacles }: TankProps) => {
-    const groupRef = useRef<Group>(null);
+const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
+    const localRef = useRef<Group>(null);
     const { forward, backward, left, right, shoot } = useKeyboard();
     const lastShootTime = useRef(0);
 
+    // Sync local ref with innerRef if provided
+    useEffect(() => {
+        if (innerRef) {
+            innerRef.current = localRef.current;
+        }
+    }, [innerRef]);
+
     useFrame((state, delta) => {
-        if (!groupRef.current) return;
+        if (!localRef.current) return;
 
         // Rotation
-        if (left) groupRef.current.rotation.y += ROTATION_SPEED * delta;
-        if (right) groupRef.current.rotation.y -= ROTATION_SPEED * delta;
+        if (left) localRef.current.rotation.y += ROTATION_SPEED * delta;
+        if (right) localRef.current.rotation.y -= ROTATION_SPEED * delta;
 
         // Movement
         const direction = new Vector3(0, 0, 1);
-        direction.applyAxisAngle(new Vector3(0, 1, 0), groupRef.current.rotation.y);
+        direction.applyAxisAngle(new Vector3(0, 1, 0), localRef.current.rotation.y);
 
         const moveDir = Number(forward) - Number(backward);
         const moveVec = direction.multiplyScalar(moveDir * SPEED * delta);
 
         // Potential new position
         if (moveDir !== 0) {
-            const nextPos = groupRef.current.position.clone().add(moveVec);
+            const nextPos = localRef.current.position.clone().add(moveVec);
 
             // Collision Check
             const TANK_RADIUS = 1.2;
@@ -45,7 +54,7 @@ const Tank = ({ onShoot, obstacles }: TankProps) => {
             });
 
             if (!hasCollision) {
-                groupRef.current.position.copy(nextPos);
+                localRef.current.position.copy(nextPos);
             }
         }
 
@@ -53,15 +62,15 @@ const Tank = ({ onShoot, obstacles }: TankProps) => {
         if (shoot && state.clock.elapsedTime - lastShootTime.current > 0.5) {
             lastShootTime.current = state.clock.elapsedTime;
             // Calculate barrel position (approximate)
-            const barrelOffset = new Vector3(0, 0.75, 1.5).applyAxisAngle(new Vector3(0, 1, 0), groupRef.current.rotation.y);
-            const spawnPos = groupRef.current.position.clone().add(barrelOffset);
+            const barrelOffset = new Vector3(0, 0.75, 1.5).applyAxisAngle(new Vector3(0, 1, 0), localRef.current.rotation.y);
+            const spawnPos = localRef.current.position.clone().add(barrelOffset);
             // Pass rotation as [x, y, z] tuple
-            onShoot(spawnPos, [0, groupRef.current.rotation.y, 0]);
+            onShoot(spawnPos, [0, localRef.current.rotation.y, 0]);
         }
     });
 
     return (
-        <group ref={groupRef} position={[0, 0, 0]}>
+        <group ref={localRef} position={[0, 0, 0]}>
             {/* Body */}
             <mesh castShadow receiveShadow position={[0, 0.25, 0]}>
                 <boxGeometry args={[1.5, 0.5, 2]} />
