@@ -137,9 +137,20 @@ const GameScene = () => {
     };
 
     const handleBulletHit = (targetId: string, bulletId: number) => {
+        // Find target to get type for scoring
+        let points = 10;
+        for (const chunk of activeChunks.values()) {
+            const target = chunk.targets.find(t => t.id === targetId);
+            if (target) {
+                if (target.type === 'metal') points = 20;
+                else if (target.type === 'tire') points = 30;
+                break;
+            }
+        }
+
         removeTarget(targetId);
         setBullets(prev => prev.filter(b => b.id !== bulletId));
-        addScore(100);
+        addScore(points);
     };
 
     const handleBulletMiss = (bulletId: number) => {

@@ -16,6 +16,8 @@ export interface Obstacle {
 export interface Target {
     id: string;
     position: [number, number, number];
+    type: 'wood' | 'metal' | 'tire';
+    rotation: [number, number, number];
 }
 
 export interface ChunkData {
@@ -146,9 +148,15 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
 
             if (collision) continue;
 
+            // 0 = Right-ish, PI/4 (45deg) = Frontal/Down, PI/2 (90deg) = Left-ish
+            const rotations = [0, Math.PI / 4, Math.PI / 2];
+            const targetRotation: [number, number, number] = [0, rotations[Math.floor(seededRandom(seed + 123) * 3)], 0];
+
             targets.push({
                 id: `target-${chunkX}-${chunkZ}-${i}`,
                 position: [x, 0, z],
+                type: seededRandom(seed + 99) < 0.5 ? 'wood' : (seededRandom(seed + 99) < 0.8 ? 'metal' : 'tire'),
+                rotation: targetRotation,
             });
             break; // Success
         }

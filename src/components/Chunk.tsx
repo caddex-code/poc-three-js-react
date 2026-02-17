@@ -31,7 +31,7 @@ const Chunk: React.FC<ChunkProps> = memo(({ data }) => {
 
             {/* Targets */}
             {data.targets.map(target => (
-                <Target key={target.id} position={target.position} />
+                <Target key={target.id} position={target.position} rotation={target.rotation} type={target.type} />
             ))}
         </group>
     );
