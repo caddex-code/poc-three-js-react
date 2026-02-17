@@ -43,7 +43,14 @@ const GameScene = () => {
         // Smoothly interpolate camera position to follow tank with offset
         const targetCamPos = new Vector3(tankPos.x + 20, tankPos.y + 20, tankPos.z + 20);
         camera.position.lerp(targetCamPos, 0.1);
-        camera.lookAt(tankPos);
+
+        // We only look at the tank once to set the initial rotation, then we stop updating rotation
+        // to prevent "wobble" or dizziness when the camera position lags slightly behind the tank.
+        // This keeps the isometric view stable.
+        if (camera.userData.isInitialized !== true) {
+            camera.lookAt(tankPos);
+            camera.userData.isInitialized = true;
+        }
 
         // 2. Chunk Management
         const newChunkX = Math.floor((tankPos.x + CHUNK_SIZE / 2) / CHUNK_SIZE);
