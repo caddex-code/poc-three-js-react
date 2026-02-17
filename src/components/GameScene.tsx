@@ -9,25 +9,29 @@ import Target from './Target';
 import Bullet from './Bullet';
 import { useGameContext } from '../context/GameContext';
 
-// Generate some random positions
+// Generate random positions with safe zone around 0,0,0
+const generateSafePosition = (minDist = 8) => {
+    let position: [number, number, number];
+    do {
+        position = [
+            (Math.random() - 0.5) * 80,
+            0,
+            (Math.random() - 0.5) * 80,
+        ];
+    } while (Math.sqrt(position[0] ** 2 + position[2] ** 2) < minDist);
+    return position;
+};
+
 const OBSTACLES = Array.from({ length: 15 }).map((_, i) => ({
     id: `obs-${i}`,
-    position: [
-        (Math.random() - 0.5) * 80,
-        0,
-        (Math.random() - 0.5) * 80,
-    ] as [number, number, number],
+    position: generateSafePosition(),
     type: Math.random() > 0.5 ? 'cactus' : 'rock',
     rotation: [0, Math.random() * Math.PI * 2, 0] as [number, number, number],
 }));
 
 const INITIAL_TARGETS = Array.from({ length: 10 }).map((_, i) => ({
     id: `target-${i}`,
-    position: [
-        (Math.random() - 0.5) * 80,
-        0,
-        (Math.random() - 0.5) * 80,
-    ] as [number, number, number],
+    position: generateSafePosition(),
 }));
 
 const GameScene = () => {
