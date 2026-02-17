@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { JSX } from "react";
 
+interface ArmData { id: number; y: number; rotY: number; }
+
 interface CactusProps {
     seed?: number;
     scale?: [number, number, number];
@@ -25,21 +27,45 @@ const Cactus = ({ seed = 0, ...props }: CactusProps & JSX.IntrinsicElements['gro
         const numArms = 1 + Math.floor(seededRandom(seed) * (heightFactor > 1.8 ? 3 : 2));
 
         for (let i = 0; i < numArms; i++) {
-            const armSeed = seed + i * 137; // distinct seed per arm
+            let bestArm: ArmData | null = null;
 
-            // Random height on stem. Main stem is 2 units high (center 1).
-            // range: 0.5 to 1.5 (relative to unscaled geometry). 
-            // Since we scale the group, we keep relative coords.
-            const yPos = 0.8 + seededRandom(armSeed) * 0.8;
+            // Try to find a non-overlapping position
+            for (let attempt = 0; attempt < 10; attempt++) {
+                const armSeed = seed + i * 137 + attempt * 997; // distinct seed per attempt
 
-            // Random rotation around Y axis
-            const rotY = seededRandom(armSeed + 1) * Math.PI * 2;
+                // Random height on stem. Main stem is 2 units high (center 1).
+                // range: 0.5 to 1.5 (relative to unscaled geometry). 
+                const yPos = 0.8 + seededRandom(armSeed) * 0.8;
 
-            generatedArms.push({
-                id: i,
-                y: yPos,
-                rotY: rotY
-            });
+                // Random rotation around Y axis
+                const rotY = seededRandom(armSeed + 1) * Math.PI * 2;
+
+                // Check collision with existing arms
+                let overlap = false;
+                for (const existing of generatedArms) {
+                    const dY = Math.abs(yPos - existing.y);
+
+                    let dRot = Math.abs(rotY - existing.rotY);
+                    // Normalize angle difference to 0..PI
+                    if (dRot > Math.PI) dRot = 2 * Math.PI - dRot;
+
+                    // If arms are close in angle (within 70 degrees) AND close in height (within 0.8 units)
+                    // The vertical arm part is ~0.8 high, so we need spacing.
+                    if (dRot < (70 * Math.PI / 180) && dY < 0.8) {
+                        overlap = true;
+                        break;
+                    }
+                }
+
+                if (!overlap) {
+                    bestArm = { id: i, y: yPos, rotY: rotY };
+                    break; // Found a valid spot
+                }
+            }
+
+            if (bestArm) {
+                generatedArms.push(bestArm);
+            }
         }
         return generatedArms;
     }, [seed, heightFactor]);
