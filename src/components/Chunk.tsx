@@ -25,7 +25,7 @@ const Chunk: React.FC<ChunkProps> = memo(({ data }) => {
             {/* Obstacles */}
             {data.obstacles.map(obs => (
                 obs.type === 'cactus' ?
-                    <Cactus key={obs.id} position={obs.position} rotation={obs.rotation} scale={obs.scale} /> :
+                    <Cactus key={obs.id} position={obs.position} rotation={obs.rotation} scale={obs.scale} seed={obs.seed} /> :
                     <Rock key={obs.id} position={obs.position} rotation={obs.rotation} scale={obs.scale} seed={obs.seed} />
             ))}
 

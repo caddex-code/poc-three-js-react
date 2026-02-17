@@ -68,9 +68,10 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
                     baseScale * (0.8 + seededRandom(seed + 104) * 0.4)
                 ];
             } else {
-                // Slight variation for cactus
-                const s = 0.8 + seededRandom(seed + 105) * 0.4;
-                scale = [s, s, s];
+                // Variation for cactus height and slight width variation
+                const w = 0.8 + seededRandom(seed + 105) * 0.4;
+                const h = 0.8 + seededRandom(seed + 106) * 1.7; // Taller range: 0.8 to 2.5
+                scale = [w, h, w];
             }
 
             const radius = type === 'rock' ? 1.0 * Math.max(scale[0], scale[2]) : 1.0;
