@@ -61,11 +61,17 @@ const GameScene = () => {
         <>
             <ambientLight intensity={0.5} />
             <directionalLight
-                position={[10, 20, 10]}
+                position={[-30, 60, -30]}
                 intensity={1.5}
                 castShadow
+                shadow-bias={-0.0005}
                 shadow-mapSize-width={2048}
                 shadow-mapSize-height={2048}
+                shadow-camera-left={-60}
+                shadow-camera-right={60}
+                shadow-camera-top={60}
+                shadow-camera-bottom={-60}
+                shadow-camera-far={300}
             />
 
             <Ground />

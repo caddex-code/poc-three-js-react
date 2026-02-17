@@ -61,7 +61,7 @@ const Tank = ({ onShoot, obstacles }: TankProps) => {
     });
 
     return (
-        <group ref={groupRef} position={[0, 0.5, 0]}>
+        <group ref={groupRef} position={[0, 0, 0]}>
             {/* Body */}
             <mesh castShadow receiveShadow position={[0, 0.25, 0]}>
                 <boxGeometry args={[1.5, 0.5, 2]} />
