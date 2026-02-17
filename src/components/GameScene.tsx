@@ -1,6 +1,6 @@
 import { useRef, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Vector3, Group } from 'three';
+import { Vector3, Group, DirectionalLight, Object3D } from 'three';
 import Tank from './Tank';
 import Bullet from './Bullet';
 import Chunk from './Chunk';
@@ -33,6 +33,8 @@ const GameScene = () => {
     const { addScore } = useGameContext();
     const bulletIdCounter = useRef(0);
     const { camera } = useThree();
+    const lightRef = useRef<DirectionalLight>(null);
+    const lightTarget = useMemo(() => new Object3D(), []);
 
 
 
@@ -85,6 +87,15 @@ const GameScene = () => {
 
                 return newChunks;
             });
+        }
+
+        // 3. Shadow Follow
+        if (lightRef.current) {
+            const tankPos = tankRef.current.position;
+            // Maintain the same relative light angle
+            lightRef.current.position.set(tankPos.x - 30, tankPos.y + 60, tankPos.z - 30);
+            lightTarget.position.set(tankPos.x, tankPos.y, tankPos.z);
+            lightTarget.updateMatrixWorld();
         }
     });
 
@@ -162,14 +173,14 @@ const GameScene = () => {
     return (
         <>
             <ambientLight intensity={0.5} />
+            <primitive object={lightTarget} />
             <directionalLight
+                ref={lightRef}
                 position={[-30, 60, -30]}
                 intensity={1.5}
                 castShadow
                 shadow-bias={-0.0005}
-                // Increase shadow map coverage for the larger area, or have it follow camera
-                // For simplicity, we keep it static-ish relative to origin or large enough
-                // Ideally directional light should follow camera too for infinite shadows
+                target={lightTarget}
                 shadow-mapSize-width={2048}
                 shadow-mapSize-height={2048}
                 shadow-camera-left={-100}
