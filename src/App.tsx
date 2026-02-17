@@ -8,7 +8,7 @@ import { GameProvider } from './context/GameContext';
 function App() {
     return (
         <GameProvider>
-            <div style={{ width: '100vw', height: '100vh', background: '#87CEEB', position: 'relative' }}>
+            <div style={{ width: '100%', height: '100%', background: '#87CEEB', position: 'relative' }}>
                 <UI />
                 <Canvas shadows>
                     <OrthographicCamera
