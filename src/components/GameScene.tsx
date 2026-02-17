@@ -4,6 +4,7 @@ import { Vector3, Group } from 'three';
 import Tank from './Tank';
 import Bullet from './Bullet';
 import Chunk from './Chunk';
+import { TrackMarks, SmokeParticles } from './TankEffects';
 import { useGameContext } from '../context/GameContext';
 import { generateChunkData, getChunkKey, ChunkData, CHUNK_SIZE, Obstacle } from '../utils/chunkManager';
 
@@ -178,6 +179,8 @@ const GameScene = () => {
                 obstacles={allObstacles}
                 innerRef={tankRef}
             />
+            <TrackMarks tankRef={tankRef} />
+            <SmokeParticles tankRef={tankRef} />
 
             {/* Render Bullets */}
             {bullets.map(bullet => (
