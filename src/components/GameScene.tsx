@@ -33,9 +33,13 @@ const GameScene = () => {
     const tankRef = useRef<Group | null>(null);
     const { addScore } = useGameContext();
     const bulletIdCounter = useRef(0);
-    const { camera } = useThree();
+    const { camera, viewport } = useThree();
     const lightRef = useRef<DirectionalLight>(null);
     const lightTarget = useMemo(() => new Object3D(), []);
+
+    // Dynamic shadow frustum size based on the window wide/height
+    const shadowSize = Math.max(viewport.width, viewport.height) * 1.5;
+    const halfSize = shadowSize / 2;
 
 
 
@@ -189,10 +193,10 @@ const GameScene = () => {
                 target={lightTarget}
                 shadow-mapSize-width={2048}
                 shadow-mapSize-height={2048}
-                shadow-camera-left={-40}
-                shadow-camera-right={40}
-                shadow-camera-top={40}
-                shadow-camera-bottom={-40}
+                shadow-camera-left={-halfSize}
+                shadow-camera-right={halfSize}
+                shadow-camera-top={halfSize}
+                shadow-camera-bottom={-halfSize}
                 shadow-camera-far={250}
                 shadow-camera-near={1}
             />
