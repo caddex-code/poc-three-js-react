@@ -28,5 +28,12 @@ export const EFFECTS_CONFIG = {
         OFFSET: 0.9,
         OPACITY: 0.6,
         COLOR: '#222',
+    },
+    TUMBLEWEED: {
+        MAX_COUNT: 2,
+        COLOR: '#B8860B', // Dark goldenrod / dry brush color
+        RADIUS: 0.6,
+        SPEED: 8,
+        SPAWN_RADIUS: 30, // Brought in closer
     }
 };

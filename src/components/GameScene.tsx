@@ -6,6 +6,7 @@ import Bullet from './Bullet';
 import Chunk from './Chunk';
 import { TrackMarks } from './effects/TrackMarks';
 import { SmokeParticles } from './effects/SmokeParticles';
+import { Tumbleweeds } from './effects/Tumbleweeds';
 import { useGameContext } from '../context/GameContext';
 import { generateChunkData, getChunkKey, ChunkData, CHUNK_SIZE, Obstacle } from '../utils/chunkManager';
 
@@ -210,6 +211,7 @@ const GameScene = () => {
             />
             <TrackMarks tankRef={tankRef} />
             <SmokeParticles tankRef={tankRef} />
+            <Tumbleweeds tankRef={tankRef} obstacles={allObstacles} />
 
             {/* Render Bullets */}
             {bullets.map(bullet => (
