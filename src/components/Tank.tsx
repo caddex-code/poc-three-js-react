@@ -21,6 +21,8 @@ const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
     const { forward, backward, left, right, shoot } = useKeyboard();
     const lastShootTime = useRef(0);
     const currentSpeed = useRef(INITIAL_SPEED);
+    // Store yaw independently so terrain tilt never corrupts it
+    const yawRef = useRef(0);
 
     // Sync local ref with innerRef if provided
     useEffect(() => {
@@ -32,11 +34,11 @@ const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
     useFrame((state, delta) => {
         if (!localRef.current) return;
 
-        // Rotation
-        if (left) localRef.current.rotation.y += ROTATION_SPEED * delta;
-        if (right) localRef.current.rotation.y -= ROTATION_SPEED * delta;
+        // --- Steering (completely independent of terrain) ---
+        if (left) yawRef.current += ROTATION_SPEED * delta;
+        if (right) yawRef.current -= ROTATION_SPEED * delta;
 
-        // Movement
+        // Movement direction based on yaw only (flat-plane direction)
         const moveDir = Number(forward) - Number(backward);
 
         // Update speed
@@ -47,7 +49,7 @@ const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
         }
 
         const direction = new Vector3(0, 0, 1);
-        direction.applyAxisAngle(new Vector3(0, 1, 0), localRef.current.rotation.y);
+        direction.applyAxisAngle(new Vector3(0, 1, 0), yawRef.current);
 
         const moveVec = direction.multiplyScalar(moveDir * currentSpeed.current * delta);
 
@@ -70,35 +72,31 @@ const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
             }
         }
 
-        // --- Terrain Height & Tilt ---
+        // --- Terrain Height ---
         const targetY = getHeight(localRef.current.position.x, localRef.current.position.z);
-        // Smooth height transition
         localRef.current.position.y = THREE.MathUtils.lerp(localRef.current.position.y, targetY, 0.2);
 
-        // Calculate tilt
+        // --- Visual Tilt (does NOT affect steering) ---
         const normal = getNormal(localRef.current.position.x, localRef.current.position.z);
         const terrainNormal = new THREE.Vector3(normal[0], normal[1], normal[2]);
 
-        // Align tank up-vector with terrain normal
-        const up = new THREE.Vector3(0, 1, 0);
-        const quaternion = new THREE.Quaternion();
-        quaternion.setFromUnitVectors(up, terrainNormal);
+        // Build the final quaternion from scratch each frame:
+        // 1. Start with the player's yaw
+        const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawRef.current);
+        // 2. Compute terrain tilt rotation
+        const tiltQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), terrainNormal);
+        // 3. Combine: tilt first, then yaw
+        const targetQuat = tiltQuat.multiply(yawQuat);
 
-        // We want to combine the Y rotation (steering) with the terrain tilt
-        const targetQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), localRef.current.rotation.y);
-        targetQuaternion.premultiply(quaternion);
+        // Smooth transition to target orientation
+        localRef.current.quaternion.slerp(targetQuat, 0.15);
 
-        // Slerp for smooth rotation
-        localRef.current.quaternion.slerp(targetQuaternion, 0.1);
-
-        // Shooting
+        // Shooting (uses yawRef for direction, independent of tilt)
         if (shoot && state.clock.elapsedTime - lastShootTime.current > 0.5) {
             lastShootTime.current = state.clock.elapsedTime;
-            // Calculate barrel position (approximate)
-            const barrelOffset = new Vector3(0, 0.75, 1.5).applyAxisAngle(new Vector3(0, 1, 0), localRef.current.rotation.y);
+            const barrelOffset = new Vector3(0, 0.75, 1.5).applyAxisAngle(new Vector3(0, 1, 0), yawRef.current);
             const spawnPos = localRef.current.position.clone().add(barrelOffset);
-            // Pass rotation as [x, y, z] tuple - using current y rotation for projectile direction
-            onShoot(spawnPos, [0, localRef.current.rotation.y, 0]);
+            onShoot(spawnPos, [0, yawRef.current, 0]);
         }
     });
 
