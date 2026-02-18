@@ -2,6 +2,7 @@
 
 
 export const CHUNK_SIZE = 100;
+import { getHeight } from './noise';
 
 export interface Obstacle {
     id: string;
@@ -110,7 +111,7 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
 
             obstacles.push({
                 id: `obs-${chunkX}-${chunkZ}-${i}`,
-                position: [x, 0, z],
+                position: [x, getHeight(x, z), z],
                 type,
                 rotation,
                 radius,
@@ -164,7 +165,7 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
 
             targets.push({
                 id: `target-${chunkX}-${chunkZ}-${i}`,
-                position: [x, 0, z],
+                position: [x, getHeight(x, z), z],
                 type: seededRandom(seed + 99) < 0.5 ? 'wood' : (seededRandom(seed + 99) < 0.8 ? 'metal' : 'tire'),
                 rotation: targetRotation,
             });
@@ -183,7 +184,7 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
 
         patches.push({
             id: `patch-${chunkX}-${chunkZ}-${i}`,
-            position: [x, -0.05, z], // Slightly above ground but below obstacles
+            position: [x, getHeight(x, z) + 0.05, z], // Slightly above ground but below obstacles
             rotation: [0, seededRandom(seed + 22) * Math.PI * 2, 0],
             scale: [
                 4 + seededRandom(seed + 33) * 8,
@@ -204,7 +205,7 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
         const pebbleScale = 0.2 + seededRandom(seed + 2) * 0.4;
         obstacles.push({
             id: `pebble-${chunkX}-${chunkZ}-${i}`,
-            position: [x, 0, z],
+            position: [x, getHeight(x, z), z],
             type: 'rock',
             rotation: [0, seededRandom(seed + 3) * Math.PI * 2, 0],
             radius: 0, // No collision radius
@@ -254,7 +255,7 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
 
             obstacles.push({
                 id: `scrap-${chunkX}-${chunkZ}-${i}`,
-                position: [x, 0, z],
+                position: [x, getHeight(x, z), z],
                 type: 'scrap',
                 rotation: [
                     seededRandom(seed + 5) * 0.4 - 0.2, // Slight tilt

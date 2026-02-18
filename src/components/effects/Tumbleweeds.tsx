@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Vector3, Group, Euler, Mesh, Frustum, Matrix4 } from 'three';
 import { EFFECTS_CONFIG, TANK_CONFIG } from '../../config/constants';
 import { Obstacle } from '../../utils/chunkManager';
+import { getHeight } from '../../utils/noise';
 
 const { MAX_COUNT, COLOR, RADIUS, SPEED, SPAWN_RADIUS } = EFFECTS_CONFIG.TUMBLEWEED;
 
@@ -116,8 +117,9 @@ export const Tumbleweeds = ({ tankRef, obstacles }: TumbleweedsProps) => {
                 t.rot.z += delta * 2;
 
                 // 3. Hopping Animation
+                const groundY = getHeight(t.pos.x, t.pos.z);
                 const hop = Math.abs(Math.sin(time * t.hopSpeed + t.hopOffset)) * 0.5;
-                t.pos.y = RADIUS + hop;
+                t.pos.y = groundY + RADIUS + hop;
 
                 // 4. Collision Check with Tank
                 const distToTank = t.pos.distanceTo(tankPos);

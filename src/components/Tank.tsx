@@ -3,6 +3,8 @@ import { useFrame } from '@react-three/fiber';
 import { Group, Vector3 } from 'three';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { Obstacle } from '../utils/chunkManager';
+import { getHeight, getNormal } from '../utils/noise';
+import * as THREE from 'three';
 
 import { TANK_CONFIG } from '../config/constants';
 
@@ -68,13 +70,34 @@ const Tank = ({ onShoot, obstacles, innerRef }: TankProps) => {
             }
         }
 
+        // --- Terrain Height & Tilt ---
+        const targetY = getHeight(localRef.current.position.x, localRef.current.position.z);
+        // Smooth height transition
+        localRef.current.position.y = THREE.MathUtils.lerp(localRef.current.position.y, targetY, 0.2);
+
+        // Calculate tilt
+        const normal = getNormal(localRef.current.position.x, localRef.current.position.z);
+        const terrainNormal = new THREE.Vector3(normal[0], normal[1], normal[2]);
+
+        // Align tank up-vector with terrain normal
+        const up = new THREE.Vector3(0, 1, 0);
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromUnitVectors(up, terrainNormal);
+
+        // We want to combine the Y rotation (steering) with the terrain tilt
+        const targetQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), localRef.current.rotation.y);
+        targetQuaternion.premultiply(quaternion);
+
+        // Slerp for smooth rotation
+        localRef.current.quaternion.slerp(targetQuaternion, 0.1);
+
         // Shooting
         if (shoot && state.clock.elapsedTime - lastShootTime.current > 0.5) {
             lastShootTime.current = state.clock.elapsedTime;
             // Calculate barrel position (approximate)
             const barrelOffset = new Vector3(0, 0.75, 1.5).applyAxisAngle(new Vector3(0, 1, 0), localRef.current.rotation.y);
             const spawnPos = localRef.current.position.clone().add(barrelOffset);
-            // Pass rotation as [x, y, z] tuple
+            // Pass rotation as [x, y, z] tuple - using current y rotation for projectile direction
             onShoot(spawnPos, [0, localRef.current.rotation.y, 0]);
         }
     });

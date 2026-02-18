@@ -1,6 +1,8 @@
 
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
+import * as THREE from 'three';
 import { ChunkData, CHUNK_SIZE } from '../utils/chunkManager';
+import { getHeight } from '../utils/noise';
 import Cactus from './Cactus';
 import Rock from './Rock';
 import Target from './Target';
@@ -11,29 +13,54 @@ interface ChunkProps {
 }
 
 const Chunk: React.FC<ChunkProps> = memo(({ data }) => {
+    // Generate terrain geometry for this chunk
+    const terrainGeometry = useMemo(() => {
+        const segments = 32;
+        const geometry = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE, segments, segments);
+
+        // Rotate to be horizontal
+        geometry.rotateX(-Math.PI / 2);
+
+        const positions = geometry.attributes.position;
+        const chunkWorldX = data.x * CHUNK_SIZE;
+        const chunkWorldZ = data.z * CHUNK_SIZE;
+
+        for (let i = 0; i < positions.count; i++) {
+            const x = positions.getX(i) + chunkWorldX;
+            const z = positions.getZ(i) + chunkWorldZ;
+
+            // Set Y based on noise
+            positions.setY(i, getHeight(x, z));
+        }
+
+        // Update normals for flat shading
+        geometry.computeVertexNormals();
+
+        return geometry;
+    }, [data.x, data.z]);
+
     return (
         <group>
             {/* Ground for this chunk */}
             <mesh
-                rotation={[-Math.PI / 2, 0, 0]}
-                position={[data.x * CHUNK_SIZE, -0.1, data.z * CHUNK_SIZE]}
+                geometry={terrainGeometry}
+                position={[data.x * CHUNK_SIZE, 0, data.z * CHUNK_SIZE]}
                 receiveShadow
             >
-                <planeGeometry args={[CHUNK_SIZE, CHUNK_SIZE]} />
-                <meshStandardMaterial color="#E6C288" />
+                <meshStandardMaterial color="#E6C288" flatShading roughness={1} />
             </mesh>
 
             {/* Ground Patches - subtle color variations */}
             {data.patches.map(patch => (
                 <mesh
                     key={patch.id}
-                    position={[patch.position[0], -0.09, patch.position[2]]}
+                    position={[patch.position[0], patch.position[1], patch.position[2]]}
                     rotation={[-Math.PI / 2, 0, patch.rotation[1]]}
                     scale={[patch.scale[0], patch.scale[2], 1]}
                     receiveShadow
                 >
                     <circleGeometry args={[1, 6]} />
-                    <meshStandardMaterial color="#D1B280" roughness={1} />
+                    <meshStandardMaterial color="#D1B280" roughness={1} transparent opacity={0.6} />
                 </mesh>
             ))}
 
