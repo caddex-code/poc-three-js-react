@@ -4,6 +4,7 @@ import { ChunkData, CHUNK_SIZE } from '../utils/chunkManager';
 import Cactus from './Cactus';
 import Rock from './Rock';
 import Target from './Target';
+import Scrap from './Scrap';
 
 interface ChunkProps {
     data: ChunkData;
@@ -38,11 +39,16 @@ const Chunk: React.FC<ChunkProps> = memo(({ data }) => {
 
 
             {/* Obstacles */}
-            {data.obstacles.map(obs => (
-                obs.type === 'cactus' ?
-                    <Cactus key={obs.id} position={obs.position} rotation={obs.rotation} scale={obs.scale} seed={obs.seed} /> :
-                    <Rock key={obs.id} position={obs.position} rotation={obs.rotation} scale={obs.scale} seed={obs.seed} />
-            ))}
+            {data.obstacles.map(obs => {
+                if (obs.type === 'cactus') {
+                    return <Cactus key={obs.id} position={obs.position} rotation={obs.rotation} scale={obs.scale} seed={obs.seed} />;
+                } else if (obs.type === 'rock') {
+                    return <Rock key={obs.id} position={obs.position} rotation={obs.rotation} scale={obs.scale} seed={obs.seed} />;
+                } else if (obs.type === 'scrap') {
+                    return <Scrap key={obs.id} position={obs.position} rotation={obs.rotation} scale={obs.scale} seed={obs.seed} />;
+                }
+                return null;
+            })}
 
             {/* Targets */}
             {data.targets.map(target => (

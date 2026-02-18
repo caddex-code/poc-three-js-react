@@ -6,7 +6,7 @@ export const CHUNK_SIZE = 100;
 export interface Obstacle {
     id: string;
     position: [number, number, number];
-    type: 'cactus' | 'rock';
+    type: 'cactus' | 'rock' | 'scrap';
     rotation: [number, number, number];
     radius: number;
     scale: [number, number, number];
@@ -212,6 +212,62 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
             seed: seed,
             collidable: false
         });
+    }
+
+    // Generate Industrial Scrap (Large and Rare)
+    const numScrap = seededRandom(seedBase + 111) > 0.7 ? Math.floor(seededRandom(seedBase + 222) * 2) + 1 : 0;
+    for (let i = 0; i < numScrap; i++) {
+        for (let attempt = 0; attempt < 15; attempt++) {
+            const seed = seedBase + 30000 + i * 100 + attempt;
+            const x = (seededRandom(seed) - 0.5) * CHUNK_SIZE + (chunkX * CHUNK_SIZE);
+            const z = (seededRandom(seed + 1) - 0.5) * CHUNK_SIZE + (chunkZ * CHUNK_SIZE);
+
+            if (chunkX === 0 && chunkZ === 0 && Math.sqrt(x * x + z * z) < 15) continue;
+
+            const scrapTypeSeed = seededRandom(seed + 2);
+            let scale: [number, number, number] = [1, 1, 1];
+            let radius = 2.0;
+
+            if (scrapTypeSeed < 0.33) { // BEAM
+                scale = [0.5, 8 + seededRandom(seed + 3) * 4, 0.5];
+                radius = 1.5;
+            } else if (scrapTypeSeed < 0.66) { // CONTAINER
+                scale = [4 + seededRandom(seed + 3) * 2, 2.5, 2.5 + seededRandom(seed + 4) * 0.5];
+                radius = 3.5;
+            } else { // PIPE
+                const r = 1.5 + seededRandom(seed + 3) * 1;
+                scale = [r, r, 6 + seededRandom(seed + 4) * 4];
+                radius = 3.0;
+            }
+
+            let collision = false;
+            // Check against obstacles
+            for (const existing of obstacles) {
+                const dist = Math.sqrt((x - existing.position[0]) ** 2 + (z - existing.position[2]) ** 2);
+                if (dist < radius + existing.radius + 2.0) {
+                    collision = true;
+                    break;
+                }
+            }
+
+            if (collision) continue;
+
+            obstacles.push({
+                id: `scrap-${chunkX}-${chunkZ}-${i}`,
+                position: [x, 0, z],
+                type: 'scrap',
+                rotation: [
+                    seededRandom(seed + 5) * 0.4 - 0.2, // Slight tilt
+                    seededRandom(seed + 6) * Math.PI * 2,
+                    seededRandom(seed + 7) * 0.4 - 0.2  // Slight tilt
+                ],
+                radius: radius,
+                scale: scale,
+                seed: seed,
+                collidable: true
+            });
+            break;
+        }
     }
 
     return {
