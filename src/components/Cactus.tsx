@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import * as THREE from 'three';
+import * as BufferUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { JSX } from "react";
-
-interface ArmData { id: number; y: number; rotY: number; }
 
 interface CactusProps {
     seed?: number;
@@ -9,92 +9,152 @@ interface CactusProps {
 }
 
 const Cactus = ({ seed = 0, ...props }: CactusProps & JSX.IntrinsicElements['group']) => {
-    // Extract height influence from scale if available, otherwise default to 1
-    const heightFactor = Array.isArray(props.scale) ? props.scale[1] : 1;
+    // Deterministic random
+    const seededRandom = (s: number) => {
+        const x = Math.sin(s) * 10000;
+        return x - Math.floor(x);
+    };
 
-    const arms = useMemo(() => {
-        const generatedArms = [];
-        // Deterministic random
-        const seededRandom = (s: number) => {
-            const x = Math.sin(s) * 10000;
-            return x - Math.floor(x);
+    const { color, geometryData } = useMemo(() => {
+        const rand = seededRandom(seed);
+
+        // Species selection
+        let speciesType: 'saguaro' | 'barrel' | 'cluster';
+        if (rand < 0.5) speciesType = 'saguaro';
+        else if (rand < 0.8) speciesType = 'barrel';
+        else speciesType = 'cluster';
+
+        // Color selection
+        const colors = ['#2E8B57', '#556B2F', '#6B8E23'];
+        const colorIdx = Math.floor(seededRandom(seed + 1) * colors.length);
+        const baseColor = new THREE.Color(colors[colorIdx]);
+        // Subtle shift per instance
+        baseColor.multiplyScalar(0.9 + seededRandom(seed + 2) * 0.2);
+
+        // Geometries array
+        const geometries: THREE.BufferGeometry[] = [];
+
+        const applyJitter = (geo: THREE.BufferGeometry, amount: number, localSeed: number) => {
+            const pos = geo.getAttribute('position');
+            const vertex = new THREE.Vector3();
+            const offsets = new Map<string, THREE.Vector3>();
+
+            const getHash = (x: number, y: number, z: number) => {
+                return Math.sin(x * 12.9898 + y * 78.233 + z * 54.53 + localSeed) * 43758.5453;
+            };
+
+            for (let i = 0; i < pos.count; i++) {
+                vertex.fromBufferAttribute(pos, i);
+                const key = `${vertex.x.toFixed(3)},${vertex.y.toFixed(3)},${vertex.z.toFixed(3)}`;
+
+                let offsetVec = offsets.get(key);
+                if (!offsetVec) {
+                    const h = getHash(vertex.x, vertex.y, vertex.z);
+                    const r = h - Math.floor(h);
+                    offsetVec = vertex.clone().multiplyScalar(1 + (r - 0.5) * amount);
+
+                    // Extra axis jitter
+                    const r2 = seededRandom(localSeed + i * 0.1);
+                    const r3 = seededRandom(localSeed + i * 0.2);
+                    const r4 = seededRandom(localSeed + i * 0.3);
+                    offsetVec.x += (r2 - 0.5) * amount * 0.5;
+                    offsetVec.y += (r3 - 0.5) * amount * 0.5;
+                    offsetVec.z += (r4 - 0.5) * amount * 0.5;
+
+                    offsets.set(key, offsetVec);
+                }
+                pos.setXYZ(i, offsetVec.x, offsetVec.y, offsetVec.z);
+            }
+            geo.computeVertexNormals();
         };
 
-        // Number of arms based on height. Taller = more arms.
-        // Base 1 arm, plus chance for more.
-        // heightFactor varies 0.8 to 2.5.
-        // chance: if height > 1.5, add extra arm.
-        const numArms = 1 + Math.floor(seededRandom(seed) * (heightFactor > 1.8 ? 3 : 2));
+        if (speciesType === 'saguaro') {
+            const mainGeo = new THREE.CylinderGeometry(0.3, 0.35, 2.2, 8, 3);
+            applyJitter(mainGeo, 0.15, seed);
+            mainGeo.translate(0, 1.1, 0); // Center at base
+            geometries.push(mainGeo);
 
-        for (let i = 0; i < numArms; i++) {
-            let bestArm: ArmData | null = null;
+            // Arm logic: 0 arms (50%), 1 arm (35%), 2 arms (15%)
+            const armRand = seededRandom(seed + 3);
+            const numArms = armRand < 0.5 ? 0 : (armRand < 0.85 ? 1 : 2);
 
-            // Try to find a non-overlapping position
-            for (let attempt = 0; attempt < 10; attempt++) {
-                const armSeed = seed + i * 137 + attempt * 997; // distinct seed per attempt
+            for (let i = 0; i < numArms; i++) {
+                const armSeed = seed + i * 731;
+                const armY = 0.8 + seededRandom(armSeed) * 0.8;
+                const armRotY = seededRandom(armSeed + 1) * Math.PI * 2;
 
-                // Random height on stem. Main stem is 2 units high (center 1).
-                // range: 0.5 to 1.5 (relative to unscaled geometry). 
-                const yPos = 0.8 + seededRandom(armSeed) * 0.8;
+                // Arm vertical part
+                const armGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.9, 8, 2);
+                applyJitter(armGeo, 0.1, armSeed + 2);
 
-                // Random rotation around Y axis
-                const rotY = seededRandom(armSeed + 1) * Math.PI * 2;
+                // Position relative to trunk
+                const angle = armRotY;
+                const radius = 0.45;
+                const x = Math.cos(angle) * radius;
+                const z = -Math.sin(angle) * radius;
 
-                // Check collision with existing arms
-                let overlap = false;
-                for (const existing of generatedArms) {
-                    const dY = Math.abs(yPos - existing.y);
+                armGeo.translate(x, armY + 0.45, z);
+                geometries.push(armGeo);
 
-                    let dRot = Math.abs(rotY - existing.rotY);
-                    // Normalize angle difference to 0..PI
-                    if (dRot > Math.PI) dRot = 2 * Math.PI - dRot;
-
-                    // If arms are close in angle (within 70 degrees) AND close in height (within 0.8 units)
-                    // The vertical arm part is ~0.8 high, so we need spacing.
-                    if (dRot < (70 * Math.PI / 180) && dY < 0.8) {
-                        overlap = true;
-                        break;
-                    }
-                }
-
-                if (!overlap) {
-                    bestArm = { id: i, y: yPos, rotY: rotY };
-                    break; // Found a valid spot
-                }
+                // Connector
+                const connGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.5, 8, 1);
+                applyJitter(connGeo, 0.05, armSeed + 3);
+                connGeo.rotateZ(Math.PI / 2);
+                connGeo.rotateY(armRotY);
+                connGeo.translate(Math.cos(angle) * 0.25, armY, -Math.sin(angle) * 0.25);
+                geometries.push(connGeo);
             }
+        } else if (speciesType === 'barrel') {
+            const barrelGeo = new THREE.IcosahedronGeometry(0.7, 1);
+            applyJitter(barrelGeo, 0.15, seed);
+            barrelGeo.scale(1, 0.8, 1);
+            barrelGeo.translate(0, 0.5, 0);
+            geometries.push(barrelGeo);
+        } else { // cluster
+            const numFingers = 3 + Math.floor(seededRandom(seed + 5) * 3);
+            for (let i = 0; i < numFingers; i++) {
+                const fSeed = seed + i * 123;
+                const h = 0.6 + seededRandom(fSeed) * 0.8;
+                const r = 0.12 + seededRandom(fSeed + 1) * 0.05;
+                const fGeo = new THREE.CylinderGeometry(r, r * 1.1, h, 8, 2);
+                applyJitter(fGeo, 0.08, fSeed + 2);
 
-            if (bestArm) {
-                generatedArms.push(bestArm);
+                const angle = (i / numFingers) * Math.PI * 2 + seededRandom(fSeed + 3) * 0.5;
+                const tilt = 0.1 + seededRandom(fSeed + 4) * 0.3;
+                const dist = 0.15 + seededRandom(fSeed + 5) * 0.1;
+
+                fGeo.rotateX(tilt);
+                fGeo.rotateY(angle);
+                const x = Math.sin(angle) * dist;
+                const z = Math.cos(angle) * dist;
+                fGeo.translate(x, h / 2, z);
+                geometries.push(fGeo);
             }
         }
-        return generatedArms;
-    }, [seed, heightFactor]);
+
+        // Merge geometries for performance
+        let finalGeo: THREE.BufferGeometry;
+        if (geometries.length > 1) {
+            finalGeo = BufferUtils.mergeGeometries(geometries);
+        } else {
+            finalGeo = geometries[0];
+        }
+
+        return { color: baseColor, geometryData: finalGeo };
+    }, [seed]);
+
+    useEffect(() => {
+        return () => geometryData.dispose();
+    }, [geometryData]);
 
     return (
         <group {...props}>
-            {/* Main stem */}
-            <mesh position={[0, 1, 0]} castShadow>
-                <cylinderGeometry args={[0.3, 0.3, 2, 8]} />
-                <meshStandardMaterial color="#2E8B57" />
+            <mesh geometry={geometryData} castShadow receiveShadow>
+                <meshStandardMaterial color={color} flatShading roughness={0.9} />
             </mesh>
-
-            {/* Generated Arms */}
-            {arms.map((arm) => (
-                <group key={arm.id} position={[0, arm.y, 0]} rotation={[0, arm.rotY, 0]}>
-                    {/* Arm Connector (diagonal/horizontal) */}
-                    <mesh position={[0.4, 0.2, 0]} rotation={[0, 0, -Math.PI / 4]} castShadow>
-                        <cylinderGeometry args={[0.2, 0.2, 0.8, 8]} />
-                        <meshStandardMaterial color="#2E8B57" />
-                    </mesh>
-                    {/* Arm Vertical Part */}
-                    <mesh position={[0.65, 0.6, 0]} castShadow>
-                        <cylinderGeometry args={[0.2, 0.2, 0.8, 8]} />
-                        <meshStandardMaterial color="#2E8B57" />
-                    </mesh>
-                </group>
-            ))}
         </group>
     );
 };
 
 export default Cactus;
+
