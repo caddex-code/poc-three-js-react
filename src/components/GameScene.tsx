@@ -7,7 +7,6 @@ import Chunk from './Chunk';
 import { TrackMarks } from './effects/TrackMarks';
 import { SmokeParticles } from './effects/SmokeParticles';
 import { useGameContext } from '../context/GameContext';
-import { SoftShadows } from '@react-three/drei';
 import { generateChunkData, getChunkKey, ChunkData, CHUNK_SIZE, Obstacle } from '../utils/chunkManager';
 
 const VIEW_DISTANCE = 1; // 1 chunk radius around the center (3x3 grid)
@@ -174,26 +173,25 @@ const GameScene = () => {
     return (
         <>
             <hemisphereLight
-                intensity={0.6}
+                intensity={0.4}
                 color="#87CEEB"
                 groundColor="#8b4513"
             />
-            <SoftShadows size={25} samples={15} focus={0.5} />
             <primitive object={lightTarget} />
             <directionalLight
                 ref={lightRef}
                 position={[-30, 60, -30]}
-                intensity={1.2}
+                intensity={1.5}
                 castShadow
                 shadow-bias={-0.0001}
-                shadow-normalBias={0.04}
+                shadow-normalBias={0.05}
                 target={lightTarget}
                 shadow-mapSize-width={2048}
                 shadow-mapSize-height={2048}
-                shadow-camera-left={-60}
-                shadow-camera-right={60}
-                shadow-camera-top={60}
-                shadow-camera-bottom={-60}
+                shadow-camera-left={-40}
+                shadow-camera-right={40}
+                shadow-camera-top={40}
+                shadow-camera-bottom={-40}
                 shadow-camera-far={250}
                 shadow-camera-near={1}
             />
