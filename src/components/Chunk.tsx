@@ -50,20 +50,6 @@ const Chunk: React.FC<ChunkProps> = memo(({ data }) => {
                 <meshStandardMaterial color="#E6C288" flatShading roughness={1} />
             </mesh>
 
-            {/* Ground Patches - subtle color variations */}
-            {data.patches.map(patch => (
-                <mesh
-                    key={patch.id}
-                    position={[patch.position[0], patch.position[1], patch.position[2]]}
-                    rotation={[-Math.PI / 2, 0, patch.rotation[1]]}
-                    scale={[patch.scale[0], patch.scale[2], 1]}
-                    receiveShadow
-                >
-                    <circleGeometry args={[1, 6]} />
-                    <meshStandardMaterial color="#D1B280" roughness={1} transparent opacity={0.6} />
-                </mesh>
-            ))}
-
 
             {/* Obstacles */}
             {data.obstacles.map(obs => {

@@ -175,25 +175,6 @@ export const generateChunkData = (chunkX: number, chunkZ: number, gameSeed: numb
 
     const patches: GroundPatch[] = [];
 
-    // Generate random ground patches (sand color variations)
-    const numPatches = Math.floor(seededRandom(seedBase + 777) * 8) + 5;
-    for (let i = 0; i < numPatches; i++) {
-        const seed = seedBase + 9000 + i;
-        const x = (seededRandom(seed) - 0.5) * CHUNK_SIZE + (chunkX * CHUNK_SIZE);
-        const z = (seededRandom(seed + 11) - 0.5) * CHUNK_SIZE + (chunkZ * CHUNK_SIZE);
-
-        patches.push({
-            id: `patch-${chunkX}-${chunkZ}-${i}`,
-            position: [x, getHeight(x, z) + 0.05, z], // Slightly above ground but below obstacles
-            rotation: [0, seededRandom(seed + 22) * Math.PI * 2, 0],
-            scale: [
-                4 + seededRandom(seed + 33) * 8,
-                1,
-                4 + seededRandom(seed + 44) * 8
-            ],
-            seed: seed
-        });
-    }
 
     // Generate small pebbles (tiny rocks for ground detail)
     const numPebbles = Math.floor(seededRandom(seedBase + 555) * 30) + 20;
