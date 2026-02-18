@@ -45,7 +45,7 @@ const Bullet = ({ position, rotation, onHit, onMiss, targets }: BulletProps) => 
     });
 
     return (
-        <mesh ref={meshRef} position={position} rotation={rotation}>
+        <mesh ref={meshRef} position={position} rotation={rotation} castShadow>
             <sphereGeometry args={[0.2, 8, 8]} />
             <meshStandardMaterial color="black" />
         </mesh>
