@@ -75,6 +75,7 @@ const RangeCircle = ({ tankRef }: { tankRef: React.RefObject<THREE.Group | null>
 
         // Reset position to origin since we're using world coords in vertices
         lineObj.position.set(0, 0, 0);
+        lineObj.geometry.computeBoundingSphere();
         lineObj.computeLineDistances();
     });
 
