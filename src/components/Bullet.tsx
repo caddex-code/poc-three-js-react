@@ -1,51 +1,67 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Vector3, Mesh } from 'three';
+import {
+    TrajectoryData,
+    ShootingStrategy,
+    parabolicStrategy,
+} from '../systems/ShootingStrategy';
+import { ARTILLERY_CONFIG } from '../config/constants';
 
 interface BulletProps {
     position: [number, number, number];
-    rotation: [number, number, number];
+    trajectory: TrajectoryData;
+    strategy?: ShootingStrategy;
     onHit: (id: string) => void;
     onMiss: () => void;
     targets: { id: string; position: [number, number, number] }[];
 }
 
-const BULLET_SPEED = 20;
-
-const Bullet = ({ position, rotation, onHit, onMiss, targets }: BulletProps) => {
+const Bullet = ({
+    position,
+    trajectory,
+    strategy = parabolicStrategy,
+    onHit,
+    onMiss,
+    targets,
+}: BulletProps) => {
     const meshRef = useRef<Mesh>(null);
-    const startPos = new Vector3(...position);
-
-    // Calculate direction based on rotation
-    const direction = new Vector3(0, 0, 1);
-    direction.applyAxisAngle(new Vector3(0, 1, 0), rotation[1]);
+    const progressRef = useRef(0); // normalized time 0 → 1
+    const hasFinished = useRef(false);
 
     useFrame((_, delta) => {
-        if (!meshRef.current) return;
+        if (!meshRef.current || hasFinished.current) return;
 
-        // Move bullet
-        meshRef.current.position.add(direction.clone().multiplyScalar(BULLET_SPEED * delta));
+        // Advance progress
+        progressRef.current += delta / trajectory.duration;
 
-        // Check collision with targets
-        const bulletPos = meshRef.current.position;
+        if (progressRef.current >= 1) {
+            progressRef.current = 1;
+            hasFinished.current = true;
 
-        for (const target of targets) {
-            const targetPos = new Vector3(...target.position);
-            // Simple distance check (radius ~1 for target)
-            if (bulletPos.distanceTo(targetPos) < 1.0) {
-                onHit(target.id);
-                return;
+            // Check collision with targets near the landing zone
+            const landingPos = trajectory.target;
+            for (const target of targets) {
+                const targetPos = new Vector3(...target.position);
+                const dist = landingPos.distanceTo(targetPos);
+                if (dist < ARTILLERY_CONFIG.SPLASH_RADIUS) {
+                    onHit(target.id);
+                    return;
+                }
             }
+
+            // No target hit
+            onMiss();
+            return;
         }
 
-        // Cleanup if too far (lifetime)
-        if (bulletPos.distanceTo(startPos) > 100) {
-            onMiss();
-        }
+        // Position bullet along trajectory
+        const currentPos = strategy.getPosition(trajectory, progressRef.current);
+        meshRef.current.position.copy(currentPos);
     });
 
     return (
-        <mesh ref={meshRef} position={position} rotation={rotation} castShadow>
+        <mesh ref={meshRef} position={position} castShadow>
             <sphereGeometry args={[0.2, 8, 8]} />
             <meshStandardMaterial color="black" />
         </mesh>

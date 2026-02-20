@@ -35,5 +35,22 @@ export const EFFECTS_CONFIG = {
         RADIUS: 0.6,
         SPEED: 8,
         SPAWN_RADIUS: 30, // Brought in closer
-    }
+    },
+};
+
+export const ARTILLERY_CONFIG = {
+    MAX_RANGE: 25,
+    PROJECTILE_SPEED: 15,
+    GRAVITY: 9.8,
+    ARC_HEIGHT_FACTOR: 1.8,
+    SPLASH_RADIUS: 1.2,
+    TRAJECTORY_POINTS: 30,
+    RANGE_CIRCLE_SEGMENTS: 64,
+    RANGE_CIRCLE_COLOR: '#ffffff',
+    RANGE_CIRCLE_OPACITY: 0.35,
+    RETICLE_COLOR: '#ff4444',
+    RETICLE_OPACITY: 0.6,
+    RETICLE_RADIUS: 0.8,
+    TRAJECTORY_COLOR: '#ffffff',
+    TRAJECTORY_OPACITY: 0.5,
 };
