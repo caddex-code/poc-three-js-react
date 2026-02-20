@@ -4,14 +4,12 @@ import { Vector3, Group, DirectionalLight, Object3D } from 'three';
 import Tank from './Tank';
 import Bullet from './Bullet';
 import Chunk from './Chunk';
-import AimingSystem from './AimingSystem';
+import { AimingSystem, useMouseAim, parabolicStrategy, TrajectoryData, ArtilleryConfig } from '../features/shooting';
 import { TrackMarks } from './effects/TrackMarks';
 import { SmokeParticles } from './effects/SmokeParticles';
 import { Tumbleweeds } from './effects/Tumbleweeds';
 import { useGameContext } from '../context/GameContext';
-import { useMouseAim } from '../hooks/useMouseAim';
 import { generateChunkData, getChunkKey, ChunkData, CHUNK_SIZE, Obstacle } from '../utils/chunkManager';
-import { parabolicStrategy, TrajectoryData, ArtilleryConfig } from '../systems/ShootingStrategy';
 import { ARTILLERY_CONFIG } from '../config/constants';
 
 const VIEW_DISTANCE = 1; // 1 chunk radius around the center (3x3 grid)

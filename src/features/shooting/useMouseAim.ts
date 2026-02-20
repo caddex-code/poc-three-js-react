@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Vector3, Raycaster, Plane, Vector2 } from 'three';
-import { getHeight } from '../utils/noise';
+import { getHeight } from '../../utils/noise';
 
 export interface MouseAimData {
     /** The actual point on the terrain where the mouse intersects */

@@ -2,9 +2,9 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Vector3, BufferGeometry, Float32BufferAttribute } from 'three';
 import * as THREE from 'three';
-import { getHeight, getNormal } from '../utils/noise';
-import { ARTILLERY_CONFIG } from '../config/constants';
-import { parabolicStrategy, ArtilleryConfig } from '../systems/ShootingStrategy';
+import { getHeight, getNormal } from '../../utils/noise';
+import { ARTILLERY_CONFIG } from '../../config/constants';
+import { parabolicStrategy, ArtilleryConfig } from './ShootingStrategy';
 
 interface AimingSystemProps {
     tankRef: React.RefObject<THREE.Group | null>;

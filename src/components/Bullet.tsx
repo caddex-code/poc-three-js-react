@@ -5,7 +5,7 @@ import {
     TrajectoryData,
     ShootingStrategy,
     parabolicStrategy,
-} from '../systems/ShootingStrategy';
+} from '../features/shooting';
 import { ARTILLERY_CONFIG } from '../config/constants';
 
 interface BulletProps {
