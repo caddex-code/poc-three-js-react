@@ -6,7 +6,7 @@ import { Obstacle } from '../utils/chunkManager';
 import { getHeight, getNormal } from '../utils/noise';
 import * as THREE from 'three';
 
-import { TANK_CONFIG } from '../config/constants';
+import { TANK_CONFIG, ARTILLERY_CONFIG } from '../config/constants';
 
 const { INITIAL_SPEED, MAX_SPEED, ACCELERATION, ROTATION_SPEED } = TANK_CONFIG;
 
@@ -21,9 +21,14 @@ const Tank = ({ onShoot, obstacles, innerRef, mouseTarget }: TankProps) => {
     const localRef = useRef<Group>(null);
     const turretRef = useRef<Group>(null);
     const barrelRef = useRef<Group>(null);
+    const recoilRef = useRef<Group>(null);
+
     const { forward, backward, left, right, shoot } = useKeyboard();
+
     const lastShootTime = useRef(0);
     const currentSpeed = useRef(INITIAL_SPEED);
+    const isRecoiling = useRef(false);
+
     // Store yaw independently so terrain tilt never corrupts it
     const yawRef = useRef(0);
     // Turret horizontal angle (follows mouse)
@@ -31,7 +36,7 @@ const Tank = ({ onShoot, obstacles, innerRef, mouseTarget }: TankProps) => {
     // Barrel vertical angle (auto-calculated from distance)
     const barrelPitchRef = useRef(0);
 
-    // Sync local ref with innerRef if provided
+    // Sync localRef with innerRef if provided
     useEffect(() => {
         if (innerRef) {
             innerRef.current = localRef.current;
@@ -125,69 +130,207 @@ const Tank = ({ onShoot, obstacles, innerRef, mouseTarget }: TankProps) => {
             const inverseTilt = tiltQuat.clone().invert();
             turretRef.current.quaternion.copy(inverseTilt.multiply(turretYawQuat));
 
-            // --- Barrel pitch based on distance ---
+            // --- Barrel pitch based on Physics Trajectory ---
             if (barrelRef.current) {
                 const distXZ = Math.sqrt(dx * dx + dz * dz);
-                const maxPitch = Math.PI / 4; // 45° max elevation
-                const normalizedDist = Math.min(distXZ / 25, 1);
-                const targetPitch = -normalizedDist * maxPitch; // negative = tilt up
+                const dy = mouseTarget.y - tankPos.y - 1.0; // Target Y relative to barrel pivot (approx height 1.0)
+
+                // Physics params matching ShootingStrategy.ts
+                const speed = ARTILLERY_CONFIG.PROJECTILE_SPEED;
+                const gravity = ARTILLERY_CONFIG.GRAVITY;
+                const arcFactor = ARTILLERY_CONFIG.ARC_HEIGHT_FACTOR;
+
+                // Flight duration
+                const duration = Math.max(distXZ / speed, 0.3);
+
+                // Vertical velocity components at launch (t=0)
+                // 1. Base parabolic velocity to reach target
+                const vyBase = (dy + 0.5 * gravity * duration * duration) / duration;
+
+                // 2. Arc bump velocity (derivative of 4*h*t*(1-t) at t=0 scaled by duration)
+                const arcHeight = distXZ * arcFactor;
+                const vyArc = (4 * arcHeight) / duration;
+
+                // Total vertical velocity
+                const vyTotal = vyBase + vyArc;
+
+                // Constant horizontal velocity
+                const vHorizontal = distXZ / duration;
+
+                // Calculate launch angle
+                // Negative because three.js rotation X=0 is forward, and we want to rotate "back" (up) which is usually negative X in this setup?
+                // Let's test negative.
+                const targetPitch = -Math.atan2(vyTotal, vHorizontal);
+
                 barrelPitchRef.current = THREE.MathUtils.lerp(
                     barrelPitchRef.current,
                     targetPitch,
-                    0.1
+                    0.2
                 );
-                barrelRef.current.rotation.x = Math.PI / 2 + barrelPitchRef.current;
+                barrelRef.current.rotation.x = barrelPitchRef.current;
+            }
+        }
+
+        // --- Recoil Animation ---
+        if (recoilRef.current) {
+            if (isRecoiling.current) {
+                // Kick back fast (on local Z)
+                recoilRef.current.position.z = THREE.MathUtils.lerp(recoilRef.current.position.z, 0.5, 0.4);
+                if (recoilRef.current.position.z > 0.45) {
+                    isRecoiling.current = false;
+                }
+            } else {
+                // Return to rest slowly
+                recoilRef.current.position.z = THREE.MathUtils.lerp(recoilRef.current.position.z, 0, 0.1);
             }
         }
 
         // --- Shooting ---
         if (shoot && mouseTarget && state.clock.elapsedTime - lastShootTime.current > 0.5) {
             lastShootTime.current = state.clock.elapsedTime;
+            isRecoiling.current = true;
 
-            // Use turret direction for barrel offset
             const worldTurretYaw = yawRef.current + turretYawRef.current;
-            const barrelOffset = new Vector3(0, 0.75, 1.5).applyAxisAngle(
+
+            // Adjust spawn pos to be at the tip of the SHORT barrel
+            // Barrel length ~1.8, position offset +0.8 base... total ~2.2?
+            const barrelOffset = new Vector3(0, 1.2, 2.2).applyAxisAngle(
                 new Vector3(0, 1, 0),
                 worldTurretYaw
             );
+
             const spawnPos = localRef.current.position.clone().add(barrelOffset);
-            onShoot(spawnPos, [0, worldTurretYaw, 0], mouseTarget.clone());
+            onShoot(spawnPos, [barrelPitchRef.current, worldTurretYaw, 0], mouseTarget.clone());
         }
     });
 
+    // Color Palette
+    const OLIVE_DRAB = "#556B2F";
+    const DARK_GUNMETAL = "#2F4F4F";
+    const SAFETY_ORANGE = "#FF4500";
+
     return (
         <group ref={localRef} position={[0, 0, 0]}>
-            {/* === Chassis === */}
-            {/* Body */}
-            <mesh castShadow receiveShadow position={[0, 0.25, 0]}>
-                <boxGeometry args={[1.5, 0.5, 2]} />
-                <meshStandardMaterial color="#8B4513" />
-            </mesh>
-
-            {/* Tracks */}
-            <mesh position={[0.9, 0.25, 0]}>
-                <boxGeometry args={[0.3, 0.5, 2.2]} />
-                <meshStandardMaterial color="#333" />
-            </mesh>
-            <mesh position={[-0.9, 0.25, 0]}>
-                <boxGeometry args={[0.3, 0.5, 2.2]} />
-                <meshStandardMaterial color="#333" />
-            </mesh>
-
-            {/* === Turret (independent rotation) === */}
-            <group ref={turretRef} position={[0, 0.5, 0]}>
-                {/* Turret block */}
-                <mesh castShadow receiveShadow position={[0, 0.25, 0]}>
-                    <boxGeometry args={[1, 0.5, 1]} />
-                    <meshStandardMaterial color="#654321" />
+            {/* === Chassis Group (Visuals only, transforms applied to localRef) === */}
+            <group>
+                {/* Main Hull Body - Lower */}
+                <mesh castShadow receiveShadow position={[0, 0.4, 0]}>
+                    <boxGeometry args={[1.8, 0.6, 2.8]} />
+                    <meshStandardMaterial color={OLIVE_DRAB} roughness={0.7} />
                 </mesh>
 
-                {/* Barrel */}
-                <group ref={barrelRef} position={[0, 0.25, 1]} rotation={[Math.PI / 2, 0, 0]}>
-                    <mesh castShadow>
-                        <cylinderGeometry args={[0.1, 0.1, 1.5, 8]} />
-                        <meshStandardMaterial color="#333" />
+                {/* Engine Block / Rear Detail */}
+                <mesh castShadow receiveShadow position={[0, 0.6, -1.1]}>
+                    <boxGeometry args={[1.4, 0.4, 0.6]} />
+                    <meshStandardMaterial color={DARK_GUNMETAL} roughness={0.8} />
+                </mesh>
+
+                {/* Left Track Group */}
+                <group position={[1.1, 0.25, 0]}>
+                    <mesh castShadow receiveShadow>
+                        <boxGeometry args={[0.5, 0.5, 3]} />
+                        <meshStandardMaterial color={DARK_GUNMETAL} />
                     </mesh>
+                    {/* Mudguard */}
+                    <mesh position={[0, 0.3, 0]}>
+                        <boxGeometry args={[0.55, 0.1, 3.1]} />
+                        <meshStandardMaterial color={OLIVE_DRAB} />
+                    </mesh>
+                    {/* Wheels details (visual only) */}
+                    <mesh position={[0.3, -0.1, 1]} rotation={[0, 0, Math.PI / 2]}>
+                        <cylinderGeometry args={[0.2, 0.2, 0.1]} />
+                        <meshStandardMaterial color="#111" />
+                    </mesh>
+                    <mesh position={[0.3, -0.1, -1]} rotation={[0, 0, Math.PI / 2]}>
+                        <cylinderGeometry args={[0.2, 0.2, 0.1]} />
+                        <meshStandardMaterial color="#111" />
+                    </mesh>
+                </group>
+
+                {/* Right Track Group */}
+                <group position={[-1.1, 0.25, 0]}>
+                    <mesh castShadow receiveShadow>
+                        <boxGeometry args={[0.5, 0.5, 3]} />
+                        <meshStandardMaterial color={DARK_GUNMETAL} />
+                    </mesh>
+                    {/* Mudguard */}
+                    <mesh position={[0, 0.3, 0]}>
+                        <boxGeometry args={[0.55, 0.1, 3.1]} />
+                        <meshStandardMaterial color={OLIVE_DRAB} />
+                    </mesh>
+                    {/* Wheels details */}
+                    <mesh position={[-0.3, -0.1, 1]} rotation={[0, 0, Math.PI / 2]}>
+                        <cylinderGeometry args={[0.2, 0.2, 0.1]} />
+                        <meshStandardMaterial color="#111" />
+                    </mesh>
+                    <mesh position={[-0.3, -0.1, -1]} rotation={[0, 0, Math.PI / 2]}>
+                        <cylinderGeometry args={[0.2, 0.2, 0.1]} />
+                        <meshStandardMaterial color="#111" />
+                    </mesh>
+                </group>
+            </group>
+
+            {/* === Turret Group (Rotates independently) === */}
+            <group ref={turretRef} position={[0, 0.7, 0.2]}>
+                {/* Turret Ring / Base */}
+                <mesh position={[0, 0.05, 0]}>
+                    <cylinderGeometry args={[0.9, 1.1, 0.4, 16]} />
+                    <meshStandardMaterial color={DARK_GUNMETAL} />
+                </mesh>
+
+                {/* Turret Main Housing */}
+                <group position={[0, 0.45, -0.2]}>
+                    <mesh castShadow receiveShadow>
+                        <boxGeometry args={[1.4, 0.8, 1.8]} />
+                        <meshStandardMaterial color={OLIVE_DRAB} />
+                    </mesh>
+                    {/* Visual Accents (Orange Stripes) */}
+                    <mesh position={[0.71, 0, 0.4]}>
+                        <boxGeometry args={[0.05, 0.6, 0.2]} />
+                        <meshStandardMaterial color={SAFETY_ORANGE} emissive={SAFETY_ORANGE} emissiveIntensity={0.5} />
+                    </mesh>
+                    <mesh position={[-0.71, 0, 0.4]}>
+                        <boxGeometry args={[0.05, 0.6, 0.2]} />
+                        <meshStandardMaterial color={SAFETY_ORANGE} emissive={SAFETY_ORANGE} emissiveIntensity={0.5} />
+                    </mesh>
+                </group>
+
+                {/* Commander Hatch */}
+                <mesh position={[0.4, 0.9, -0.5]}>
+                    <cylinderGeometry args={[0.3, 0.3, 0.2, 8]} />
+                    <meshStandardMaterial color={DARK_GUNMETAL} />
+                </mesh>
+
+                {/* === Cannon Pivot Group (Rotates on X for pitch) === */}
+                <group ref={barrelRef} position={[0, 0.4, 0.8]}>
+
+                    {/* Recoil Group (Moves on Z) */}
+                    <group ref={recoilRef}>
+                        {/* Main Barrel - SHORTENED (Mortar style) */}
+                        <mesh castShadow position={[0, 0, 0.9]} rotation={[Math.PI / 2, 0, 0]}>
+                            {/* Thicker (0.3) and Shorter (1.8) */}
+                            <cylinderGeometry args={[0.3, 0.35, 1.8, 16]} />
+                            <meshStandardMaterial color={DARK_GUNMETAL} roughness={0.5} />
+                        </mesh>
+
+                        {/* Barrel Base/Sleeve */}
+                        <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                            <cylinderGeometry args={[0.4, 0.4, 0.8, 16]} />
+                            <meshStandardMaterial color={OLIVE_DRAB} />
+                        </mesh>
+
+                        {/* Muzzle Brake */}
+                        <mesh position={[0, 0, 1.8]} rotation={[Math.PI / 2, 0, 0]}>
+                            <cylinderGeometry args={[0.38, 0.3, 0.4, 12]} />
+                            <meshStandardMaterial color={DARK_GUNMETAL} />
+                        </mesh>
+
+                        {/* Muzzle Accent Ring */}
+                        <mesh position={[0, 0, 1.9]} rotation={[Math.PI / 2, 0, 0]}>
+                            <torusGeometry args={[0.3, 0.05, 8, 24]} />
+                            <meshStandardMaterial color={SAFETY_ORANGE} emissive={SAFETY_ORANGE} />
+                        </mesh>
+                    </group>
                 </group>
             </group>
         </group>
