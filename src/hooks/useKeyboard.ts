@@ -58,12 +58,28 @@ export const useKeyboard = () => {
             }
         };
 
+        const handleMouseDown = (e: MouseEvent) => {
+            if (e.button === 0) { // Left click
+                setInput((s) => ({ ...s, shoot: true }));
+            }
+        };
+
+        const handleMouseUp = (e: MouseEvent) => {
+            if (e.button === 0) {
+                setInput((s) => ({ ...s, shoot: false }));
+            }
+        };
+
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('mousedown', handleMouseDown);
+        window.addEventListener('mouseup', handleMouseUp);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('mousedown', handleMouseDown);
+            window.removeEventListener('mouseup', handleMouseUp);
         };
     }, []);
 
