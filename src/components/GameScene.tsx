@@ -2,7 +2,8 @@ import { useRef, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Vector3, Group, DirectionalLight, Object3D } from 'three';
 import Tank from './Tank';
-import Bullet from './Bullet';
+import Projectile from './Projectile';
+import { Explosion } from './Explosion';
 import Chunk from './Chunk';
 import { AimingSystem, useMouseAim, parabolicStrategy, TrajectoryData, ArtilleryConfig } from '../features/shooting';
 import { TrackMarks } from './effects/TrackMarks';
@@ -13,6 +14,7 @@ import { generateChunkData, getChunkKey, ChunkData, CHUNK_SIZE, Obstacle } from 
 import { ARTILLERY_CONFIG } from '../config/constants';
 
 const VIEW_DISTANCE = 1; // 1 chunk radius around the center (3x3 grid)
+const EXPLOSION_RADIUS = 3.5; // AoE Radius for damage
 
 const artilleryConfig: ArtilleryConfig = {
     maxRange: ARTILLERY_CONFIG.MAX_RANGE,
@@ -23,8 +25,14 @@ const artilleryConfig: ArtilleryConfig = {
 };
 
 const GameScene = () => {
-    const [bullets, setBullets] = useState<
-        { id: number; position: Vector3; trajectory: TrajectoryData }[]
+    // State for new Projectile system
+    const [projectiles, setProjectiles] = useState<
+        { id: number; trajectory: TrajectoryData }[]
+    >([]);
+
+    // State for explosions
+    const [explosions, setExplosions] = useState<
+        { id: number; position: Vector3 }[]
     >([]);
 
     // Chunk Management
@@ -44,7 +52,8 @@ const GameScene = () => {
 
     const tankRef = useRef<Group | null>(null);
     const { addScore } = useGameContext();
-    const bulletIdCounter = useRef(0);
+    const projectileIdCounter = useRef(0);
+    const explosionIdCounter = useRef(0);
     const { camera, viewport } = useThree();
     const lightRef = useRef<DirectionalLight>(null);
     const lightTarget = useMemo(() => new Object3D(), []);
@@ -116,27 +125,9 @@ const GameScene = () => {
         return obs;
     }, [activeChunks]);
 
-    // Helper to find and remove target
-    const removeTarget = (targetId: string) => {
-        setActiveChunks(prev => {
-            const newChunks = new Map(prev);
-            for (const [key, chunk] of newChunks.entries()) {
-                if (chunk.targets.some(t => t.id === targetId)) {
-                    const newChunk = {
-                        ...chunk,
-                        targets: chunk.targets.filter(t => t.id !== targetId)
-                    };
-                    newChunks.set(key, newChunk);
-                    break;
-                }
-            }
-            return newChunks;
-        });
-    };
-
-    // Aggregate targets for Bullet component
+    // Aggregate targets just for AoE calculation
     const allTargets = useMemo(() => {
-        let t: { id: string, position: [number, number, number] }[] = [];
+        let t: { id: string, position: [number, number, number], type: string }[] = [];
         activeChunks.forEach(chunk => {
             t = t.concat(chunk.targets);
         });
@@ -144,33 +135,65 @@ const GameScene = () => {
     }, [activeChunks]);
 
     const handleShoot = (position: Vector3, _rotation: [number, number, number], targetPoint: Vector3) => {
-        const id = bulletIdCounter.current++;
+        const id = projectileIdCounter.current++;
         const trajectory = parabolicStrategy.calculateTrajectory(
             position,
             targetPoint,
             artilleryConfig
         );
-        setBullets(prev => [...prev, { id, position, trajectory }]);
+        setProjectiles(prev => [...prev, { id, trajectory }]);
     };
 
-    const handleBulletHit = (targetId: string, bulletId: number) => {
-        let points = 10;
-        for (const chunk of activeChunks.values()) {
-            const target = chunk.targets.find(t => t.id === targetId);
-            if (target) {
-                if (target.type === 'metal') points = 20;
-                else if (target.type === 'tire') points = 30;
-                break;
+    const handleProjectileExplode = (projectileId: number, position: Vector3) => {
+        // 1. Remove Projectile
+        setProjectiles(prev => prev.filter(p => p.id !== projectileId));
+
+        // 2. Spawn Explosion Effect
+        const explId = explosionIdCounter.current++;
+        setExplosions(prev => [...prev, { id: explId, position }]);
+
+        // 3. Calculate AoE Damage
+        const targetsToDestroy: string[] = [];
+        let scoreToAdd = 0;
+
+        allTargets.forEach(target => {
+            const tPos = new Vector3(...target.position);
+            const dist = position.distanceTo(tPos);
+
+            if (dist <= EXPLOSION_RADIUS) {
+                targetsToDestroy.push(target.id);
+                // Score logic
+                if (target.type === 'metal') scoreToAdd += 20;
+                else if (target.type === 'tire') scoreToAdd += 30;
+                else scoreToAdd += 10;
             }
-        }
+        });
 
-        removeTarget(targetId);
-        setBullets(prev => prev.filter(b => b.id !== bulletId));
-        addScore(points);
+        if (targetsToDestroy.length > 0) {
+            addScore(scoreToAdd);
+            // Batch remove targets
+            setActiveChunks(prev => {
+                const newChunks = new Map(prev);
+                let changed = false;
+
+                // We need to iterate chunks to find which ones hold the specific targets
+                // Since lookup map by ID is hard, we iterate all chunks (few active anyway)
+                for (const [key, chunk] of newChunks.entries()) {
+                    const originalCount = chunk.targets.length;
+                    const newTargets = chunk.targets.filter(t => !targetsToDestroy.includes(t.id));
+
+                    if (newTargets.length !== originalCount) {
+                        newChunks.set(key, { ...chunk, targets: newTargets });
+                        changed = true;
+                    }
+                }
+                return changed ? newChunks : prev;
+            });
+        }
     };
 
-    const handleBulletMiss = (bulletId: number) => {
-        setBullets(prev => prev.filter(b => b.id !== bulletId));
+    const handleExplosionComplete = (id: number) => {
+        setExplosions(prev => prev.filter(e => e.id !== id));
     };
 
     return (
@@ -214,21 +237,28 @@ const GameScene = () => {
             <SmokeParticles tankRef={tankRef} />
             <Tumbleweeds tankRef={tankRef} obstacles={allObstacles} />
 
-            {/* Aiming System — reads mouseAim mutably each frame */}
+            {/* Aiming System */}
             <AimingSystem
                 tankRef={tankRef}
                 mouseAim={mouseAim}
             />
 
-            {/* Render Bullets */}
-            {bullets.map(bullet => (
-                <Bullet
-                    key={bullet.id}
-                    position={[bullet.position.x, bullet.position.y, bullet.position.z]}
-                    trajectory={bullet.trajectory}
-                    targets={allTargets}
-                    onHit={(targetId) => handleBulletHit(targetId, bullet.id)}
-                    onMiss={() => handleBulletMiss(bullet.id)}
+            {/* Render Projectiles */}
+            {projectiles.map(p => (
+                <Projectile
+                    key={p.id}
+                    type="ROCKET"
+                    trajectory={p.trajectory}
+                    onExplode={(pos) => handleProjectileExplode(p.id, pos)}
+                />
+            ))}
+
+            {/* Render Explosions */}
+            {explosions.map(e => (
+                <Explosion
+                    key={e.id}
+                    position={e.position}
+                    onComplete={() => handleExplosionComplete(e.id)}
                 />
             ))}
         </>
